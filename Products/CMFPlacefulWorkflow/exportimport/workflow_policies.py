@@ -22,6 +22,9 @@ __version__ = "$Revision:  $"
 # $Source:  $
 # $Id:  $
 __docformat__ = 'restructuredtext'
+
+from plone.browserlayer.interfaces import ILocalBrowserLayerType
+
 from Products.GenericSetup.utils import exportObjects, importObjects
 from Products.GenericSetup.utils import XMLAdapterBase
 from Products.GenericSetup.OFSP.exportimport import FolderXMLAdapter
@@ -31,6 +34,9 @@ from Products.CMFCore.exportimport.workflow import WorkflowToolXMLAdapter
 
 from Products.CMFPlacefulWorkflow.DefaultWorkflowPolicy import DEFAULT_CHAIN
 from Products.CMFPlacefulWorkflow.global_symbols import Log, LOG_DEBUG
+
+from zope.component import queryUtility
+
 
 _marker = []
 
@@ -102,6 +108,7 @@ class WorkflowPoliciesXMLAdapter(WorkflowToolXMLAdapter):
         chain from another policy or from portal_workfow.
         """
         seen = set()
+        contenttypes_installed = self.contenttypes_installed()
         for child in node.childNodes:
             if child.nodeName != 'bindings':
                 continue
@@ -122,10 +129,23 @@ class WorkflowPoliciesXMLAdapter(WorkflowToolXMLAdapter):
                         'included a chain: %s' % (type_id, chain))
                     if default:
                         # omit from the policy to acquire
-                        self.context.setChain(type_id, (DEFAULT_CHAIN,))
+                        try:
+                            self.context.setChain(type_id, (DEFAULT_CHAIN,))
+                        except:
+                            if type_id == 'Topic' and contenttypes_installed:
+                                # In p.a.contenttypes, Topic no longer
+                                # exits it has been replaced by Collection...
+                                self.context.setChain('Collection', chain)
+                            else:
+                                raise
                     else:
-                        self.context.setChain(type_id, chain)
-
+                        try:
+                            self.context.setChain(type_id, chain)
+                        except ValueError:
+                            if type_id == 'Topic' and contenttypes_installed:
+                                self.context.setChain('Collection', chain)
+                            else:
+                                raise
 
     def _getChain(self, node):
         result = super(WorkflowPoliciesXMLAdapter,
@@ -133,6 +153,11 @@ class WorkflowPoliciesXMLAdapter(WorkflowToolXMLAdapter):
         if result == '':
             return []
         return result.split(',')
+
+    def contenttypes_installed(self):
+        existing = queryUtility(ILocalBrowserLayerType, name='plone.app.contenttypes')
+        return bool(existing)
+
 
 def importWorkflowPolicies(context):
     """Import workflow policies from the XML file.

@@ -4,7 +4,8 @@ Changelog
 1.5.11 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- For compatibility with plone.app.contenttypes, if installed, use the 
+  "Collection" type instead of "Topic."
 
 
 1.5.10 (2013-12-07)
